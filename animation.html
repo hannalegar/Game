@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html><head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <style type="text/css">
+    #screen {
+      background: url('images/bg.png') lightblue;
+    }
+  </style>
+  <script>
+
+    function Sprite(args) {
+      this.image = new Image();
+      this.image.src = args.imgSrc;
+      this.x = args.x  || (args.screen.width/2)-(args.spw/2);
+      this.y = args.y || (args.screen.height-args.spw);
+      this.imgFrames = args.frames || 1;
+      this.frame = 0;
+
+      this.Draw = function() {
+        ctx.drawImage(this.image, this.frame, 0, args.spw,
+                      args.spw, this.x, this.y, args.spw, args.spw);
+        this.frame += 76.2;
+        if( this.frame >= this.image.width ) this.frame = 0;
+      };
+    };
+
+    function Run() {
+      ctx.clearRect(0,0, screen.width, screen.height);
+      sprite.Draw();
+    }
+  </script>
+</head>
+<body>
+  <div style="margin: 0 auto; width: 320px;">
+    <canvas id="screen" width="320" height="120"></canvas>
+    <p id="status"></p>
+  </div>
+  <script>
+
+    var screen = document.getElementById('screen');
+    var ctx = screen.getContext('2d');  
+
+    var spriteOptions = {
+      screen: screen,
+      imgSrc: 'animation copy.png',
+      spw: 76.2,
+      frames: 10
+    };
+
+    var sprite = new Sprite(spriteOptions);
+    function Play(){
+        window.setInterval(Run, 30);
+    }
+
+    Play();
+  </script>
+  <noscript>You need javascript to run the demo!</noscript>
+</body></html>

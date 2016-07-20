@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Gamedev Canvas workshop</title>
+        <style>
+            * {padding: 0; margin: 0}
+            canvas {background:  #d5edf7; display: block; margin: 0 auto;}
+        </style>
+
+         <script>
+            
+            function Sprite(args) {
+                this.image = new Image();
+                this.image.src = args.imgSrc;
+                this.x = args.x  || (args.screen.width/2)-(args.spw/2);
+                this.y = args.y || (args.screen.height-args.spw);
+                this.imgFrames = args.frames || 1;
+                this.frame = 0;
+                
+                this.Draw = function(x, y, ctx, b) {
+                    ctx.drawImage(this.image, this.frame, 0, args.spw,
+                                args.spw, x, y, args.spw, args.spw);
+                        this.frame += 76.2;
+                    if( this.frame >= this.image.width ) 
+                    {
+                        this.frame = 0;
+                        b.play = false;
+                    }
+                }
+            }
+
+            function Layer(s, x, y, speed){
+                this.img = new Image();
+                this.img.src = s;
+                this.x = x;
+                this.y = y;
+                this.speed = speed || 6;
+            }
+
+            function ParalellScrolling(ctx, imgdata){
+                var self = this;
+                imgdata = imgdata || [];
+                this.ctx = ctx;
+                var speed = 6;
+
+                this.layers = new Array(imgdata.length);
+                for(i = 0; i < imgdata.length; i++){
+                    this.layers[i] = new Layer(imgdata[i], 0, 0, speed * (i + 1));
+                }
+
+                this.Move = function(x){
+                    for(var i = 0; i < self.layers.length; i++) {
+			            if( self.layers[i].x > canvas.width) {
+                            self.layers[i].x = 0;
+                        }
+                        else {
+                            self.layers[i].x = x / self.layers[i].speed;
+                        }		
+		            }
+                }
+
+                this.Draw = function(){
+                    for(var i = self.layers.length - 1; i >= 0; i--){
+                        var x1 = (self.layers[i].x - self.layers[i].img.width);
+                        self.ctx.drawImage(self.layers[i].img, 0, 0, self.layers[i].img.width, self.layers[i].img.height, self.layers[i].x, canvas.height - 450, self.layers[i].img.width, self.layers[i].img.height);
+                        self.ctx.drawImage(self.layers[i].img, 0, 0, self.layers[i].img.width, self.layers[i].img.height, x1, canvas.height - 450, self.layers[i].img.width, self.layers[i].img.height);
+                    }
+                }
+            }
+
+            function Particle(canvas, ctx, x, y){
+                this.width = 20;
+                this.height = 19.8;
+                this.x = x;
+                this.y = y;
+                this.dx = Math.random() * 10 - 5;
+                this.dy = Math.random() * 10 - 5;
+                this.img = new Image();
+                this.img.src = '/Puzzle_pack/PNG/Particles white/particleWhite_6.png';
+                this.life = 0;
+                particleIndex++;
+                particles[particleIndex] = this;
+                this.id = particleIndex;
+                this.maxLife = Math.floor(Math.random() * 30 );
+
+                this.Draw = function(){
+                    this.x += this.dx;
+                    this.y += this.dy;
+                    this.life++;
+                    
+                    if(this.life == this.maxLife){
+                        delete particles[this.id];
+                    }
+
+                    ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
+                }
+            }
+
+            function Game(canvas, ctx){ 
+                this.time = 0;
+                this.win = 0;
+                this.winTime = 0;
+                this.stop = false;
+                this.Cx = 0;
+                this.Cy = 0;
+                this.CX = 0;
+                this.CY = 0;
+                this.iBall;
+                this.iObject;
+                this.resolution = 4 * 5;
+                this.length;
+                this.state = "START_SCREEN";
+                this.lvlsImg = [{
+                    x: 10,
+                    y: 10,
+                    width: 180,
+                    height: 180,
+                    img: new Image(),
+                    file: 'lvl1.png'
+                },{
+                    x: 10,
+                    y: 210,
+                    width: 180,
+                    height: 180,
+                    img: new Image(),
+                    file: 'lvl2.png'
+                },{
+                    x: 410,
+                    y: 10,
+                    width: 180,
+                    height: 180,
+                    img: new Image(),
+                    file: 'lvl3.png'
+                },{
+                    x: 410,
+                    y: 210,
+                    width: 180,
+                    height: 180,
+                    img: new Image(),
+                    file: 'lvl4.png'
+                },{
+                    x: 210,
+                    y: 110,
+                    width: 180,
+                    height: 180,
+                    img: new Image(),
+                    file: 'lvl5.png'
+                }];
+                
+                for(var i = 0; i < this.lvlsImg.length; i++){
+                    this.lvlsImg[i].img.src = this.lvlsImg[i].file;
+                }
+
+                //font params
+                    this.font = "32px Arial";
+                    this.blue = "#0095DD";
+                    this.lightBlue = "#D5EDF7";                    
+
+                //congratulation parameters
+                    this.cText = "Congratulation!";
+                    this.cTextWidth = this.cText.length * 18 -  18;
+                    this.cTextX = (canvas.width - this.cTextWidth) / 2;
+                    this.textY = (canvas.height / 6);
+
+                //score parameters
+                    this.scoreTextWidth = score.text.length * 18 + score.score.toString().length * 18;
+                    this.scoreTextX = (canvas.width - this.scoreTextWidth) / 2;
+                    this.scoreTextY = (canvas.height / 4) + 25;
+
+                //button parameters
+                    this.buttonWidth = 160;
+                    this.buttonHeight = 60;
+                    this.buttonsPadding = 50;
+                    this.lvlsButtonX = (canvas.width - (2 * this.buttonWidth) - this.buttonsPadding) / 2;
+                    this.startButtonX = this.lvlsButtonX + this.buttonsPadding + this.buttonWidth;
+                    this.buttonY = (canvas.height / 4) * 3;
+                    this.buttonTextY = this.buttonY + this.buttonHeight - 18;
+                    
+                //game over parameters
+                    this.gameOver = "Game over!";
+                    this.goTextWidth = this.gameOver.length * 18 + 10;
+                    this.goTextX = (canvas.width - this.goTextWidth) / 2;
+
+                this.bounds = function(ball, paddle, ictx){
+                    if(ball.x + ball.dx < ball.radius || ball.x + ball.dx > canvas.width - ball.radius){
+                        ball.dx = -ball.dx;
+                    }
+                    else if(ball.y + ball.dy < ball.radius){
+                        ball.dy = -ball.dy;
+                    }
+                    else if(ball.y + ball.radius >= canvas.height - paddle.height && ((ball.x - ball.radius >= paddle.x && ball.x - ball.radius <= paddle.x + paddle.width) ||
+                        (ball.x + ball.radius >= paddle.x & ball.x + ball.radius <= paddle.x + paddle.width))){
+                        
+                        this.collisionDetection(ball, paddle, ictx);
+                    }
+                    else if(ball.y + ball.radius >= canvas.height){
+                        lives.lives--;
+                        if(!lives.lives){
+                            this.state = "LOSE_SCREEN";
+                        }
+                        else {
+                            ball.x = canvas.width / 2;
+                            ball.y = canvas.height - 30;
+                            ball.dx = 2;
+                            ball.dy = -2;
+                            paddle.x = (canvas.width - paddle.width) / 2;
+                        }
+                    }
+                }
+
+                this.collisionDetection = function(ball, object, ictx){
+                    if(((ball.x + ball.radius >= object.x && ball.x + ball.radius <= object.x + object.width) ||
+                        (ball.x - ball.radius >= object.x && ball.x - ball.radius <= object.x + object.width)) && ((ball.y + ball.radius >= object.y && ball.y + ball.radius <= object.y + object.height) || 
+                        (ball.y - ball.radius >= object.y && ball.y - ball.radius <= object.y + object.height))){
+                        
+                        this.Cx = ball.x - ball.radius < object.x ? object.x : ball.x - ball.radius;
+                        this.Cy = ball.y - ball.radius < object.y ? object.y : ball.y - ball.radius
+                        this.CX = ball.x + ball.radius < object.x + object.width ? ball.x + ball.radius : object.x + object.width;
+                        this.CY = ball.y + ball.radius < object.y + object.height ? ball.y + ball.radius : object.y + object.height;
+
+                        ictx.clearRect(this.Cx, this.Cy, this.CX - this.Cx, this.CY - this.Cy);
+                        ictx.drawImage(ball.img, this.Cx, this.Cy, this.CX - this.Cx, this.CY - this.Cy);
+                        this.iBall = ictx.getImageData(this.Cx, this.Cy, (this.CX - this.Cx || 1), (this.CY - this.Cy || 1));
+                            
+                        ictx.clearRect(this.Cx, this.Cy, this.CX - this.Cx, this.CY - this.Cy);
+                        ictx.drawImage(object.img, this.Cx, this.Cy, this.CX - this.Cx, this.CY - this.Cy);
+                        this.iObject = ictx.getImageData(this.Cx, this.Cy, (this.CX - this.Cx || 1), (this.CY - this.Cy || 1));
+
+                        this.length = this.iBall.data.length;
+                        for(var i = 0; i < this.length; i += this.resolution){
+                            if(!this.iBall.data[i + 3] || !this.iObject.data[i + 3]){
+                                continue;
+                            }
+                            else {
+                                object.collision(ball);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                this.Start = function(){
+
+                    this.startBtnWidth = 200;
+                    this.startBtnHeight = 60;
+                    this.startBtnPadding = 20;
+                    this.startBtnX = (canvas.width - this.startBtnWidth) / 2;
+                    this.startBtnY = (canvas.height - (2 * this.startBtnHeight) - this.startBtnPadding) / 2;
+                    this.lvlsBtnY =  this.startBtnY + this.startBtnPadding + this.startBtnHeight;
+                    
+                    this.sBtnText = "Start game";
+                    this.sBtnTextwidth = this.sBtnText.length * 18 - 18;
+                    this.sBtnTextX = (this.startBtnX + (this.startBtnWidth - this.sBtnTextwidth) / 2); 
+
+                    this.lvlsBtnText = "Levels";
+                    this.lvlsBtnTextwidth = this.lvlsBtnText.length * 18 - 18;
+                    this.lvlsBtnTextX = (this.startBtnX + (this.startBtnWidth - this.lvlsBtnTextwidth) / 2);
+
+                    this.StartButton(this.startBtnX, this.startBtnY, this.startBtnWidth, this.startBtnHeight, this.sBtnTextX);
+                    this.LevelsButton(this.startBtnX, this.lvlsBtnY, this.startBtnWidth, this.startBtnHeight, this.lvlsBtnTextX);
+                }
+
+                this.StartButton = function(x, y, width, height, textX){
+                    this.drawRect(x, y, width, height);
+                    this.drawText(this.font, this.lightBlue, "Start game", textX, y + height - 18);
+                }
+
+                this.LevelsButton = function(x, y, width, height, textX){
+                    this.drawRect(x, y, width, height);
+                    this.drawText(this.font, this.lightBlue, "Levels", textX, y + height - 18);
+                }
+
+                this.Levels = function(){
+                    for(i = 0; i < lvlsImg.length; i++){
+                        ctx.drawImage(this.lvlsImg[i].img, lvlsImg[i].x, lvlsImg[i].y, lvlsImg[i].width, lvlsImg[i].height);
+                    }
+                }
+
+
+                this.Win = function(score, lives, paralell, ball){
+                    this.clear();
+                    this.background = new ParalellScrolling(ctx, backgrounds[this.win]);
+                    this.background.Draw();
+
+                    this.scoreTextWidth = score.text.length * 18 + score.score.toString().length * 18;
+                    this.scoreTextX = (canvas.width - this.scoreTextWidth) / 2;
+                    //grey starts
+                    for(var i = 1; i <= 3 - lives.lives; i++){
+                        ctx.drawImage(lives.greyImg, canvas.width - 128 - i * (lives.width * 4 + 20), (canvas.height / 2) - lives.height * 4 / 2, lives.width * 4, lives.height * 4)
+                    }
+
+                    //yellow stars
+                    for(var j = i; j <= 3; j++){
+                        ctx.drawImage(lives.yellowImg, canvas.width - 128 - j * (lives.width * 4 + 20), (canvas.height / 2) - lives.height * 4 / 2, lives.width * 4, lives.height * 4)
+                    }
+
+                    this.drawText(this.font, this.blue, (score.text + score.score), this.scoreTextX, this.scoreTextY);
+                    this.drawText(this.font, this.blue, this.cText, this.cTextX, this.textY);
+                    
+                    //levels button
+                    this.drawRect(this.lvlsButtonX, this.buttonY, this.buttonWidth, this.buttonHeight);
+                    this.drawText(this.font, this.lightBlue, "Levels", 150, this.buttonTextY);
+
+                    //next level button
+                    this.drawRect(this.startButtonX, this.buttonY, this.buttonWidth, this.buttonHeight);
+                    this.drawText(this.font, this.lightBlue, "Next Level", 330, this.buttonTextY);
+
+                    ball.x = canvas.width / 2;
+                    ball.y = canvas.height - 30;
+                    ball.dx = 2;
+                    ball.dy = -2;
+                    
+                }
+
+                this.select = function(){
+                    for(var i = 0; i < this.lvlsImg.length; i++){
+                        ctx.drawImage(this.lvlsImg[i].img, this.lvlsImg[i].x, this.lvlsImg[i].y, this.lvlsImg[i].width, this.lvlsImg[i].height);
+                    }
+                }
+
+                this.Lose = function(lives, score){
+                    this.clear();
+                    this.background = new ParalellScrolling(ctx, backgrounds[this.win]);
+                    this.background.Draw();
+
+                    this.scoreTextWidth = score.text.length * 18 + score.score.toString().length * 18;
+                    this.scoreTextX = (canvas.width - this.scoreTextWidth) / 2;
+
+                    for(var i = 1; i <= 3; i++){
+                        ctx.drawImage(lives.greyImg, canvas.width - 128 - i * (lives.width * 4 + 20), (canvas.height / 2) - lives.height * 4 / 2, lives.width * 4, lives.height * 4)
+                    }
+
+                    this.drawText(this.font, this.blue, this.gameOver, this.goTextX, this.textY);
+                    this.drawText(this.font, this.blue, (score.text + score.score), this.scoreTextX, this.scoreTextY);
+                    
+                    //levels button
+                    this.drawRect(this.lvlsButtonX, this.buttonY, this.buttonWidth, this.buttonHeight);
+                    this.drawText(this.font, this.lightBlue, "Levels", 150, this.buttonTextY);
+
+                    //startbutton
+                    this.drawRect(this.startButtonX, this.buttonY, this.buttonWidth, this.buttonHeight);
+                    this.drawText(this.font, this.lightBlue, "Start", 366, this.buttonTextY);
+
+                }
+
+                this.drawRect = function(x, y, width, height){
+                    ctx.beginPath();
+                    ctx.rect(x, y, width, height);
+                    ctx.fillStyle = "#0095DD";
+                    ctx.fill();
+                    ctx.closePath();
+                }
+
+                this.drawText = function(font, style, text, x, y){
+                    ctx.font = font;
+                    ctx.fillStyle = style;
+                    ctx.fillText(text, x, y);
+                }
+                
+                this.clear = function(){
+                    ball.x = canvas.width / 2;
+                    ball.y = canvas.height - 30;
+                    ball.dx = 0;
+                    ball.dy = 0;
+                    paddle.width = 70;
+                    paddle.height = 16;
+                    red.status = 0;
+                    green.status = 0;
+                    pink.status = 0;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+
+            function Paddle(canvas, ctx){
+                this.width = 70;
+                this.height = 16;
+                this.INCREASE = 1.1;
+                this.DECREASE = 0.9;
+                this.green = 0;
+                this.red = 0;
+                this.pink = 0;
+                this.x = (canvas.width - this.width) / 2;
+                this.y = (canvas.height - this.height);
+                this.img = new Image();
+                this.img.src = 'Puzzle_pack/PNG/Paddles/paddle_06.png';
+
+                this.Draw = function(){
+                    ctx.drawImage(this.img, this.x, (canvas.height - this.height), this.width, this.height);
+                }
+
+                this.collision = function(ball){    
+                    ball.dy = -ball.dy
+                    ball.y = paddle.y - ball.radius;
+                    
+                    particleNum = Math.floor(Math.random() * Math.abs(ball.dx * 5) + Math.abs(ball.dx));
+                    for(var i = 0; i < particleNum; i++){
+                        new Particle(canvas, ctx, ball.x, ball.y);
+                    }
+
+                    animateParticles = true;
+                }
+            }
+
+            function Score(canvas, ctx){
+                this.score = 0;
+                this.text = "Score: ";
+
+                this.Draw =  function(){
+                    ctx.font = "16px Arial";
+                    ctx.fillStyle = "#0095DD";
+                    ctx.fillText(this.text + this.score, 8, 20);
+                }
+            }
+
+            function Lives(canvas, ctx){
+                this.lives = 3;
+                this.yellowImg = new Image();
+                this.yellowImg.src = 'Puzzle_pack/PNG/Tiles yellow/tileYellow_21.png';
+                this.greyImg = new Image();
+                this.greyImg.src = 'Puzzle_pack/PNG/Tiles grey/tileGrey_21.png';
+                this.width = 22;
+                this.height = 20;
+
+                this.Draw = function(){
+                    for(var i = 1; i <= this.lives; i++){
+                        ctx.drawImage(this.yellowImg, canvas.width - i * (7 + this.width), 5, this.width, this.height);
+                    }
+                }
+            }
+
+            function Ball(canvas, ctx){
+                this.x = canvas.width / 2;
+                this.y = canvas.height - 30;
+                this.radius = 10;
+                this.dx = 0;
+                this.dy = 0;
+                this.img = new Image();
+                this.img.src = 'Puzzle_pack/PNG/Balls/blue/ballBlue_10 copy.png';
+
+                this.Draw = function(){
+                    ctx.drawImage(this.img, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+                }
+            }
+            
+            function Brick(canvas, ctx){
+                this.x = 0;
+                this.y = 0;
+                this.width = 64;
+                this.height = 32;
+                this.status = 0;
+                this.padding = 10;
+                this.rowCount = 4;
+                this.columnCount = 7;
+                this.offsetTop = 30;
+                this.offsetLeft = 46;
+                this.animationX = 0;
+                this.animationY = 0;
+                this.play = false;
+                this.img = new Image();
+                
+
+                this.Draw = function(rectImg){
+                    this.img.src = rectImg[this.status - 1].file;
+                    ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
+                }
+
+                this.Animation = function(animation){
+                    if(this.play){
+                        animation.Draw(this.x, this.y, ctx, this); 
+                    }
+                }
+
+                this.collision = function(ball){
+                    if(this.status > 0){
+                        this.status--;
+                        score.score++;
+                        //snd.play();
+                        if(ball.x + ball.radius >= this.x && ball.x <= this.x){
+                            ball.dx = -ball.dx;
+                            ball.x = this.x - ball.radius;
+                        }
+                        else if(ball.x - ball.radius <= this.x + this.width && ball.x > this.x + this.width){
+                            ball.dx = -ball.dx;
+                            ball.x = this.x + this.width + ball.radius;
+                        }
+                        else if(ball.y + ball.radius >= this.y && ball.y < this.y){
+                            ball.dy = -ball.dy;
+                            ball.y = this.y - ball.radius;
+                        }
+                        else if(ball.y - ball.radius <= this.y + this.height && ball.y > this.height){
+                            ball.dy = -ball.dy;
+                            ball.y = this.y + this.height + ball.radius;
+                        }
+                        else{
+                            ball.dy = -ball.dy;
+                        }
+                        if(this.status == 0){
+                            this.play = true;
+                        }               
+                    }
+                }
+            }
+            
+            function Bonus(canvas, ctx, img){
+                this.x = 0;
+                this.y = 0;
+                this.width = 30;
+                this.height = 30;
+                this.fromTop = canvas.height / 3 + 40;
+                this.fromBottom = canvas.height - 60;
+                this.img = new Image();
+                this.img.src = img.src;
+                this.status = 0;
+                this.time = 0;
+
+                if(this.img.src.includes('green')){
+                    this.color = 'green';
+                }
+                else if(this.img.src.includes('pink')){
+                    this.color = 'pink';
+                }
+                else if(this.img.src.includes('red')){
+                    this.color = 'red';
+                }
+
+                this.Draw = function(){
+                    this.status = 1;
+                    ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
+                }
+
+                this.showPolygon = function(color1, color2, ictx){
+                    if(this.status == 0 && game.time % Math.floor(Math.random() * 1000) == 0){
+                        this.colors(this, color1, color2);
+                        this.Draw();  
+                    }
+                    else if(this.status == 1){
+                        this.Draw();
+                        game.collisionDetection(ball, this, ictx);
+                        this.time++;
+                        if(this.time % Math.floor(Math.random() * 15000) == 0){
+                            this.status = 0;
+                        }
+                    }
+                }
+
+                this.colorBrickCollisionDetection = function(color1X, color1Y, color2X, color2Y){
+                    var ret;
+                    if(color1X > color2X && color1X < color2X + green.width){
+                        ret =  false;
+                    }
+                    else if(color1X + green.width > color2X && color1X + green.width < color2X + green.width){
+                        ret = false;
+                    }
+                    else if(color1Y > color2Y && color1Y < color2Y + green.height){
+                        ret = false;
+                    }
+                    else if(color1Y + green.height > color2Y && color1Y + green.height < color2Y + green.height){
+                        ret = false;
+                    }
+                    else {
+                        ret = true;
+                    }
+                    return ret;
+                }
+
+                this.colors = function(color1, color2, color3){
+                    if(color2.status == 0 && color3.status == 0){
+                            color1.x = this.addX();
+                            color1.y = this.addY();
+                    }
+                    else if(color2.status == 1 && color3.status == 0) {
+                        do{
+                            color1.x = this.addX();
+                            color1.y = this.addY();
+                        }while(!this.colorBrickCollisionDetection(color1.x, color1.y, color2.x, color2.y))
+                    }
+                    else if(color2.status == 0 && color3.status == 1) {
+                        do{
+                            color1.x = this.addX();
+                            color1.y = this.addY();
+                        }while(!this.colorBrickCollisionDetection(color1.x, color1.y, color3.x, color3.y))
+                    }
+                    else if(color2.status == 1 && color3.status == 1){
+                        do{
+                            color1.x = this.addX();
+                            color1.y = this.addY();
+                        }while((!this.colorBrickCollisionDetection(color1.x, color1.y, color2.x, color2.y)) || (!this.colorBrickCollisionDetection(color1.x, color1.y, color3.x, color3.y)))
+                    }
+                }
+
+                this.addX = function(){
+                    return Math.floor(Math.random() * (canvas.width - brick.width));
+                }
+
+                this.addY = function(){
+                    return Math.floor(Math.random() * (green.fromTop + 30 - green.fromBottom)) + green.fromBottom;
+                }
+
+                this.collision = function(ball){
+                    switch (this.color) {
+                        case 'green':
+                            this.status = 0;
+                            if(paddle.width <= canvas.width / 2){
+                                paddle.width *=  paddle.INCREASE;
+                                paddle.height *=  paddle.INCREASE;
+                                paddle.green++;
+                            }
+                            break;
+                        case 'red':
+                            this.status = 0;
+                            paddle.width *= paddle.DECREASE;
+                            paddle.height *= paddle.DECREASE;
+                            if(paddle.width <= 10){
+                                lives.lives--;
+                                if(!lives.lives){
+                                    game.state = "LOSE_SCREEN";
+                                }
+                            }
+                            paddle.red++;
+                            break;
+                        case 'pink':
+                            this.status = 0;
+                            ball.dx *= 2;
+                            ball.dy *= 2;
+                            break;
+                    }
+                    if(paddle.green > 0 && (Math.floor(Math.random() * 1500) == Math.floor(Math.random() * 1500))){
+                        paddle.width *= paddle.DECREASE;
+                        paddle.height *= paddle.DECREASE;
+                        paddle.green--;
+                    }
+                    else if(paddle.red > 0 && (Math.floor(Math.random() * 1500) == Math.floor(Math.random() * 1500))){
+                        paddle.width *= paddle.INCREASE;
+                        paddle.height *= paddle.INCREASE;
+                        paddle.red--;
+                    }
+                    else if(paddle.pink > 0 && (Math.floor(Math.random() * 1500) == Math.floor(Math.random() * 1500))){
+                        ball.dx /= 2;
+                        ball.dy /= 2;
+                        paddle.pink--;
+                    }
+                }
+            }
+
+        </script>
+    </head>
+    <body>
+        
+        <canvas id="myCanvas" width="600" height="400"></canvas>
+        <canvas id="myCanvas2" width="600" height="400"></canvas>
+
+        <script>
+            var canvas = document.getElementById("myCanvas");
+            var ctx = canvas.getContext("2d");
+
+            var ictx = document.getElementById("myCanvas2").getContext("2d");
+
+            var snd = new Audio("Plop.ogg");
+            
+            var redPolygon = new Image();
+            redPolygon.src = 'Puzzle_pack/PNG/Tiles red/tileRed_41 copy.png';
+            
+            var greenPolygon = new Image();
+            greenPolygon.src = 'Puzzle_pack/PNG/Tiles green/tileGreen_41 copy.png';
+            
+            var pinkPolygon = new Image();
+            pinkPolygon.src = 'Puzzle_pack/PNG/Tiles pink/tilePink_41 copy.png'; 
+            
+            var brick = {width: 64, height: 32, padding: 10, rowCount: 4, columnCount: 7, offsetTop: 30, offsetLeft: 46};    
+            var bricks = [];
+            
+            var lives = new Lives(canvas, ctx);
+            var paddle = new Paddle(canvas, ctx);
+            var ball = new Ball(canvas, ctx);
+            var score = new Score(canvas, ctx);
+            var green = new Bonus(canvas, ctx, greenPolygon);
+            var red = new Bonus(canvas, ctx, redPolygon);
+            var pink = new Bonus(canvas, ctx, pinkPolygon);
+            var game = new Game(canvas, ctx);
+
+            var particles = [];
+            var particleIndex = 0;
+            var particleNum;
+            var animateParticles = false;
+
+            var rectImg = [{
+                img: new Image(),
+                file: 'Puzzle_pack/PNG/Tiles blue/tileBlue_38.png'
+            },
+            {
+                img: new Image(),
+                file: 'Puzzle_pack/PNG/Tiles yellow/tileYellow_38.png'
+            },{
+                img: new Image(),
+                file: 'Puzzle_pack/PNG/Tiles green/tileGreen_38.png'
+            }]
+            
+            for(i = 0; i < rectImg.length; i++){
+                rectImg[i].img.src = rectImg[i].file;
+            }
+
+            var spriteOptions = {
+                screen: myCanvas,
+                imgSrc: 'animation copy.png',
+                spw: 76.2,
+                frames: 12
+            };
+            var sprite = new Sprite(spriteOptions);
+            
+            var backgrounds = [
+                ['Background/lvl1/background_layer.png', 'Background/lvl1/middle_layer.png', 'Background/lvl1/top_layer.png'].reverse(),
+                ['Background/lvl2/background_layer.png', 'Background/lvl2/middle_layer.png', 'Background/lvl2/top_layer.png'].reverse(),
+                ['Background/lvl3/background_layer.png', 'Background/lvl3/middle_layer.png', 'Background/lvl3/top_layer.png'].reverse(),
+                ['Background/lvl4/background_layer.png', 'Background/lvl4/middle_layer.png', 'Background/lvl4/top_layer.png'].reverse(),
+                ['Background/lvl5/background_layer.png', 'Background/lvl5/middle_layer.png', 'Background/lvl5/top_layer.png'].reverse()
+            ];
+            var paralell = new ParalellScrolling();
+
+            function background(){
+                paralell = new ParalellScrolling(ctx, backgrounds[game.win]);
+            }
+
+            fillMatrix();
+            gameLoop();
+
+            document.addEventListener("mousemove", mouseMoveHandler, false);
+            document.addEventListener('click', clickHandler, false);
+
+            function clickHandler(e){
+                console.log(e.clientX - canvas.offsetLeft);
+                console.log(e.clientY);
+                if(game.state == "START_SCREEN"){
+                    if(e.clientX - canvas.offsetLeft > game.startBtnX && e.clientX - canvas.offsetLeft < game.startBtnX + game.startBtnWidth){
+                        if(e.clientY > game.startBtnY && e.clientY < game.startBtnY + game.startBtnHeight){
+                            game.state = 'GAME_SCREEN';
+                            game.clear();
+                            background();     
+                        }
+                        else if(e.clientY > game.lvlsBtnY && e.clientY < game.lvlsBtnY + game.startBtnHeight){
+                            game.clear();
+                            game.state = "LEVEL_SELECT_SCREEN";
+                            game.select();
+                        }
+                    }
+                }
+                else if (game.state == "LEVEL_SELECT_SCREEN"){
+                    if(e.clientX - canvas.offsetLeft > 10 && e.clientX-canvas.offsetLeft < 190){
+                        if(e.clientY > 10 && e.clientY < 190){
+                            game.win = 0;
+                            fillMatrix();
+                            game.state = 'GAME_SCREEN';
+                            game.clear();
+                            background();
+                        }
+                        else if(e.clientY > 210 && e.clientY < 390){
+                            game.win = 3;
+                            fillMatrix3();
+                            game.state = 'GAME_SCREEN';
+                            game.clear();
+                            background();
+                        }
+                    }
+                    else if (e.clientX - canvas.offsetLeft > 210 && e.clientX-canvas.offsetLeft < 390){
+                        if(e.clientY > 110 && e.clientY < 290){
+                            game.win = 2;
+                            fillMatrix2();
+                            game.state = 'GAME_SCREEN';
+                            game.clear();
+                            background();
+                        }
+                    }
+                    else if (e.clientX - canvas.offsetLeft > 410 && e.clientX-canvas.offsetLeft < 590){
+                        if(e.clientY > 10 && e.clientY < 190){
+                            game.win = 1;
+                            fillMatrix1();
+                            game.state = 'GAME_SCREEN';
+                            game.clear();
+                            background();
+                        }
+                        else if(e.clientY > 210 && e.clientY < 390){
+                            game.win = 4;
+                            fillMatrix4();
+                            game.state = 'GAME_SCREEN';
+                            game.clear();
+                            background();
+                        }
+                    }
+                }
+                else if(game.state == 'WIN_SCREEN'){
+                    if(e.clientY >= game.buttonY && e.clientY <= game.buttonY + game.buttonHeight){
+                        if(e.clientX - canvas.offsetLeft >= game.lvlsButtonX && e.clientX - canvas.offsetLeft <= game.lvlsButtonX + game.buttonWidth){
+                            game.clear();
+                            game.state = "LEVEL_SELECT_SCREEN";
+                        }
+                        else if(e.clientX - canvas.offsetLeft >= game.startButtonX && e.clientX - canvas.offsetLeft <= game.startButtonX + game.buttonWidth){
+                            game.win++;
+                            game.state = 'GAME_SCREEN';
+                            game.clear();
+                            levels();
+                            background();
+                        }
+                    }
+                }
+                else if(game.state == "LOSE_SCREEN"){
+                    if(e.clientY >= game.buttonY && e.clientY <= game.buttonY + game.buttonHeight){
+                        if(e.clientX - canvas.offsetLeft >= game.lvlsButtonX && e.clientX - canvas.offsetLeft <= game.lvlsButtonX + game.buttonWidth){
+                            game.state = "LEVEL_SELECT_SCREEN";
+                            game.win = 0;
+                            score.score = 0;
+                            lives.lives = 3;
+                            game.clear();
+                        }
+                        else if(e.clientX - canvas.offsetLeft >= game.startButtonX && e.clientX - canvas.offsetLeft <= game.startButtonX + game.buttonWidth){
+                            game.win = 0;
+                            score.score = 0;
+                            lives.lives = 3;
+                            game.clear();
+                            game.state = 'GAME_SCREEN';
+                            levels();
+                        }
+                    }
+                }
+                else if(game.state == "GAME_SCREEN"){
+                    if(e.clientX - canvas.offsetLeft > 0 && e.clientX - canvas.offsetLeft < canvas.width &&
+                        e.clientY > 0 && e.clientY < canvas.height){
+                        if(ball.dx == 0 && ball.dy == 0){
+                            ball.dx = 2;
+                            ball.dy = -2;
+
+                        }                   
+                     }
+                }
+            }
+
+            function mouseMoveHandler(e){
+                var relativeX = e.clientX - canvas.offsetLeft;
+                if(relativeX > paddle.width /2 && relativeX < canvas.width - paddle.width/2){
+                    paddle.x = relativeX - paddle.width / 2;
+                }
+                paralell.Move(paddle.x);
+            }
+
+            function fillMatrix(){
+                for(c = 0; c < brick.columnCount; c++){
+                    bricks[c] = [];
+                    for(r = 0; r < brick.rowCount; r++){
+                        var b = new Brick(canvas, ctx);
+                        b.status = Math.floor(Math.random() * 3) + 1;
+                        var brickX = (c * (brick.width + brick.padding)) + brick.offsetLeft;
+                        var brickY = (r * (brick.height + brick.padding)) + brick.offsetTop;
+                        b.x = brickX;
+                        b.y = brickY;
+                        bricks[c][r] = b;
+                    }
+                }
+            }
+
+            function fillMatrix1(){
+                status();
+                for (c = 0; c < brick.columnCount; c++){
+                    for (r = 0; r < brick.rowCount; r++){
+                        var b = bricks[c][r];
+                        if(c % 2 == 1 && r % 2 == 1){
+                            b.status = Math.floor(Math.random() * 3) + 1;
+                        }
+                        else if (c % 2 == 0 && r % 2 == 0){
+                            b.status = Math.floor(Math.random() * 3) + 1;
+                        }
+                    }
+                }
+            }
+
+            function fillMatrix2(){
+                status();
+                bricks[1][0].status = Math.floor(Math.random() * 3) + 1;
+                bricks[2][0].status = Math.floor(Math.random() * 3) + 1;
+                bricks[0][1].status = Math.floor(Math.random() * 3) + 1;
+                bricks[3][1].status = Math.floor(Math.random() * 3) + 1;
+                bricks[1][2].status = Math.floor(Math.random() * 3) + 1;
+                bricks[3][2].status = Math.floor(Math.random() * 3) + 1;
+                bricks[2][3].status = Math.floor(Math.random() * 3) + 1;
+            }
+
+            function fillMatrix3(){
+                status();
+                for(c = 0; c < brick.columnCount; c++){
+                    for(r = 0; r < brick.rowCount; r++){
+                        var b = bricks[c][r];
+                        b.status = 0;
+                        if (r == 0){
+                            b.status = Math.floor(Math.random() * 3) + 1;
+                        }
+                        else if(r == 1 && (c > 0 && c < 6)){
+                            b.status = Math.floor(Math.random() * 3) + 1;
+                        }
+                        else if(r == 2 && c > 1 && c < 5){
+                            b.status = Math.floor(Math.random() * 3) + 1;
+                        }
+                        else if(r == 3 && c == 3){
+                            b.status = Math.floor(Math.random() * 3) + 1;
+                        }
+                    }
+                }
+            }
+
+            function fillMatrix4(){
+                status();
+                bricks[1][0].status = Math.floor(Math.random() * 3) + 1;
+                bricks[3][0].status = Math.floor(Math.random() * 3) + 1;
+                bricks[5][0].status = Math.floor(Math.random() * 3) + 1;
+                bricks[2][1].status = Math.floor(Math.random() * 3) + 1;
+                bricks[1][2].status = Math.floor(Math.random() * 3) + 1;
+                bricks[3][2].status = Math.floor(Math.random() * 3) + 1;
+                bricks[5][2].status = Math.floor(Math.random() * 3) + 1;
+                bricks[1][3].status = Math.floor(Math.random() * 3) + 1;
+                bricks[3][3].status = Math.floor(Math.random() * 3) + 1;
+                bricks[4][3].status = Math.floor(Math.random() * 3) + 1;
+                bricks[5][3].status = Math.floor(Math.random() * 3) + 1;
+            }
+
+            function status(){
+                for(c = 0; c < brick.columnCount; c++){
+                    for(r = 0; r < brick.rowCount; r++){
+                        var b = bricks[c][r];
+                        if(b.status >= 1){
+                            b.status = 0;
+                        }
+                    }
+                }
+            }
+
+            function collisionDetection() {
+                for(var c = 0; c < brick.columnCount; c++){
+                    for (var r = 0; r < brick.rowCount; r++){
+                        var b = bricks[c][r];
+                        game.collisionDetection(ball, b, ictx);
+                    }
+                }
+            }
+
+            function drawBricks(){
+                for(c = 0; c < brick.columnCount; c++){
+                    for(r = 0; r < brick.rowCount; r++){
+                        if(bricks[c][r].status >= 1){
+                          bricks[c][r].Draw(rectImg);
+                        }
+                    }
+                }
+            }
+            
+            function drawLine(){
+                ctx.beginPath();
+                ctx.rect(C.x,C.y, C.X - C.x, C.Y - C.y);
+                ctx.strokeStyle = "balck";
+                ctx.stroke();
+                ctx.closePath();
+            }
+
+            function levels(){
+                switch(game.win){
+                    case 1:
+                        fillMatrix1();
+                        break;
+                    case 2:
+                        fillMatrix2();
+                        break;
+                    case 3:
+                        fillMatrix3();
+                        break;
+                    case 4:
+                        fillMatrix4();
+                        break;
+                    default:
+                        fillMatrix();
+                        break;
+                }
+            }
+
+            function animate(){
+                for(var c = 0; c < brick.columnCount; c++){
+                    for(var r = 0; r < brick.rowCount; r++){
+                        var b = bricks[c][r];
+                        if(b.play){
+                            b.Animation(sprite);
+                        }
+                    }
+                }
+            }
+
+            function brickCounter(){
+                var status = true;
+                for(var c = 0; c < brick.columnCount; c++){
+                    for(var r = 0; r < brick.rowCount; r++){
+                        if(bricks[c][r].status > 0){
+                            status = false;
+                        }
+                    }
+                }
+                if(status){
+                    game.state = "WIN_SCREEN";
+                }
+            }
+
+            function drawParticle(){
+                if(animateParticles){
+
+                    for(var i in particles){
+                        particles[i].Draw();
+                    }
+                }
+                if(particles.length == 0){
+                    animateParticles = false;
+                }
+            }
+
+            function gameLoop(){
+                if (game.stop) {
+                    return;
+                }
+
+                switch (game.state) {
+                    case 'START_SCREEN':
+                        game.Start();
+                        break;
+                    case 'GAME_SCREEN':
+                        game.time++;
+                        paralell.Draw();
+                        paddle.Draw();
+                        lives.Draw();
+                        ball.Draw();
+                        score.Draw();
+                        game.bounds(ball, paddle, ictx);
+                        drawBricks();
+                        collisionDetection();
+                        green.showPolygon(red, pink, ictx);
+                        red.showPolygon(green, pink, ictx);
+                        pink.showPolygon(green, red, ictx);
+                        brickCounter();
+                        animate();
+                        drawParticle();
+                        ball.x += ball.dx;
+                        ball.y += ball.dy;
+                        break;
+                     case 'WIN_SCREEN':
+                        game.Win(score, lives, paralell, ball);
+                        break;
+                    case 'LOSE_SCREEN':
+                        game.Lose(lives, score);
+                        break;
+                    case 'LEVEL_SELECT_SCREEN':
+                        game.select();
+                        break;
+                }
+                requestAnimationFrame(gameLoop);
+            }
+        </script>
+    </body>
+</html>
